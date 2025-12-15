@@ -1,21 +1,19 @@
-param(
-  [string]$Url = "http://localhost:3000/",
-  [int]$TimeoutSec = 30
-)
+$maxRetries = 10
+$delay = 3
+$url = "http://localhost:3000/"
 
-$end = (Get-Date).AddSeconds($TimeoutSec)
-
-while ((Get-Date) -lt $end) {
-  try {
-    $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 5
-    if ($response.StatusCode -eq 200) {
-      "SMOKE PASSED - API RESPONDS"
-      exit 0
+for ($i = 1; $i -le $maxRetries; $i++) {
+    try {
+        $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5
+        if ($response.StatusCode -eq 200) {
+            Write-Host "SMOKE PASSED - API RESPONDING"
+            exit 0
+        }
+    } catch {
+        Write-Host "Attempt $i/$maxRetries - API not ready yet"
     }
-  } catch {
-    Start-Sleep 2
-  }
+    Start-Sleep -Seconds $delay
 }
 
-"SMOKE FAILED - API NOT RESPONDING"
+Write-Host "SMOKE FAILED - API NOT RESPONDING"
 exit 1
