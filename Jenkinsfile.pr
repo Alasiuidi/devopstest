@@ -25,14 +25,14 @@ pipeline {
 
     stage('Build') {
       steps {
-        powershell 'docker build -f DOCKERFILE -t $env:IMAGE_NAME .'
+        powershell 'docker build -f DOCKERFILE -t express-pr .'
       }
     }
 
     stage('Run (Docker)') {
       steps {
         powershell '''
-          docker rm -f express-pr-container || exit 0
+          docker rm -f express-pr-container -ErrorAction SilentlyContinue
           docker run -d --name express-pr-container -p 3000:3000 express-pr
         '''
       }
@@ -47,7 +47,7 @@ pipeline {
 
   post {
     always {
-      powershell 'docker rm -f express-pr-container || exit 0'
+      powershell 'docker rm -f express-pr-container -ErrorAction SilentlyContinue'
     }
   }
 }
