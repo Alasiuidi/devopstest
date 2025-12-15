@@ -25,23 +25,18 @@ pipeline {
 
     stage('Build') {
       steps {
-        powershell '''
-          docker build -f DOCKERFILE -t $env:IMAGE_NAME .
-        '''
+        powershell 'docker build -f DOCKERFILE -t express-pr .'
       }
     }
 
     stage('Run (Docker)') {
       steps {
         powershell '''
-          if (docker ps -a --format "{{.Names}}" | Select-String $env:CONTAINER_NAME) {
-            docker rm -f $env:CONTAINER_NAME
+          if (docker ps -a --format "{{.Names}}" | Select-String "express-pr-container") {
+            docker rm -f express-pr-container
           }
 
-          docker run -d `
-            --name $env:CONTAINER_NAME `
-            -p $env:PORT:3000 `
-            $env:IMAGE_NAME
+          docker run -d --name express-pr-container -p 3000:3000 express-pr
         '''
       }
     }
@@ -59,8 +54,8 @@ pipeline {
   post {
     always {
       powershell '''
-        if (docker ps -a --format "{{.Names}}" | Select-String $env:CONTAINER_NAME) {
-          docker rm -f $env:CONTAINER_NAME
+        if (docker ps -a --format "{{.Names}}" | Select-String "express-pr-container") {
+          docker rm -f express-pr-container
         }
       '''
     }
