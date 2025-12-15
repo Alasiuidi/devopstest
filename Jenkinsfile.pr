@@ -32,7 +32,9 @@ pipeline {
     stage('Run (Docker)') {
       steps {
         powershell '''
-          docker rm -f express-pr-container -ErrorAction SilentlyContinue
+          if (docker ps -a --format "{{.Names}}" | Select-String "express-pr-container") {
+            docker rm -f express-pr-container
+          }
           docker run -d --name express-pr-container -p 3000:3000 express-pr
         '''
       }
@@ -40,14 +42,21 @@ pipeline {
 
     stage('Smoke Test') {
       steps {
-        powershell '.\\scripts\\smoke.ps1'
+        powershell '''
+          Start-Sleep -Seconds 10
+          .\\scripts\\smoke.ps1
+        '''
       }
     }
   }
 
   post {
     always {
-      powershell 'docker rm -f express-pr-container -ErrorAction SilentlyContinue'
+      powershell '''
+        if (docker ps -a --format "{{.Names}}" | Select-String "express-pr-container") {
+          docker rm -f express-pr-container
+        }
+      '''
     }
   }
 }
