@@ -31,10 +31,11 @@ pipeline {
 
     stage('Run (Docker)') {
       steps {
-        powershell '''
-          docker rm -f $env:CONTAINER_NAME 2>$null | Out-Null
-          docker run -d -p $env:PORT:3000 --name $env:CONTAINER_NAME $env:IMAGE_NAME
-        '''
+        powershell """
+          docker rm -f ${env.CONTAINER_NAME} 2>$null | Out-Null
+          docker run -d --name ${env.CONTAINER_NAME} -p 3000:3000 ${env.IMAGE_NAME}
+        """
+
       }
     }
 
