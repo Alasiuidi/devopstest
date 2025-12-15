@@ -31,10 +31,10 @@ pipeline {
 
     stage('Run (Docker)') {
       steps {
-        powershell """
-          docker rm -f ${env.CONTAINER_NAME} 2>\\$null | Out-Null
-          docker run -d --name ${env.CONTAINER_NAME} -p 3000:3000 ${env.IMAGE_NAME}
-        """
+        powershell '''
+          docker rm -f express-pr-container || exit 0
+          docker run -d --name express-pr-container -p 3000:3000 express-pr
+        '''
       }
     }
 
@@ -47,7 +47,7 @@ pipeline {
 
   post {
     always {
-      powershell 'docker rm -f $env:CONTAINER_NAME 2>\\$null | Out-Null'
+      powershell 'docker rm -f express-pr-container || exit 0'
     }
   }
 }
