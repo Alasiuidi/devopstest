@@ -13,10 +13,10 @@ pipeline {
     IMAGE_NAME = "express-pr"
     CONTAINER_NAME = "express-pr-container"
     PORT = "3000"
-    ARTIFACTS_DIR = "artifacts"
   }
 
   stages {
+
     stage('Checkout') {
       steps {
         checkout scm
@@ -32,10 +32,9 @@ pipeline {
     stage('Run (Docker)') {
       steps {
         powershell """
-          docker rm -f ${env.CONTAINER_NAME} 2>$null | Out-Null
+          docker rm -f ${env.CONTAINER_NAME} 2>\\$null | Out-Null
           docker run -d --name ${env.CONTAINER_NAME} -p 3000:3000 ${env.IMAGE_NAME}
         """
-
       }
     }
 
@@ -48,7 +47,7 @@ pipeline {
 
   post {
     always {
-      powershell 'docker rm -f $env:CONTAINER_NAME 2>$null | Out-Null'
+      powershell 'docker rm -f $env:CONTAINER_NAME 2>\\$null | Out-Null'
     }
   }
 }
