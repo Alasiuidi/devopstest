@@ -1,5 +1,5 @@
 param(
-  [int]$Port = 3000
+  [int]$Port
 )
 
 $url = "http://localhost:$Port/"
@@ -9,7 +9,6 @@ $delay = 3
 for ($i = 1; $i -le $maxAttempts; $i++) {
   try {
     $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 3
-
     if ($response.StatusCode -eq 200) {
       Write-Host "SMOKE PASSED - API responding"
       exit 0

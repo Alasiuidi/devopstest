@@ -10,9 +10,8 @@ pipeline {
   }
 
   environment {
-    IMAGE_NAME = "express-pr"
+    IMAGE_NAME     = "express-pr"
     CONTAINER_NAME = "express-pr-container"
-    PORT = "3000"
   }
 
   stages {
@@ -25,17 +24,20 @@ pipeline {
 
     stage('Build') {
       steps {
-        powershell 'docker build -f DOCKERFILE -t express-pr .'
+        powershell '''
+          docker build -f DOCKERFILE -t $env:IMAGE_NAME .
+        '''
       }
     }
 
     stage('Run (Docker)') {
       steps {
         powershell '''
-          if (docker ps -a --format "{{.Names}}" | Select-String "express-pr-container") {
-            docker rm -f express-pr-container
+          if (docker ps -a --format "{{.Names}}" | Select-String $env:CONTAINER_NAME) {
+            docker rm -f $env:CONTAINER_NAME
           }
-          docker run -d --name express-pr-container -p 3000:3000 express-pr
+
+          docker run -d --name $env:CONTAINER_NAME -P $env:IMAGE_NAME
         '''
       }
     }
@@ -43,8 +45,14 @@ pipeline {
     stage('Smoke Test') {
       steps {
         powershell '''
-          Start-Sleep -Seconds 10
-          .\\scripts\\smoke.ps1
+          Start-Sleep -Seconds 5
+
+          $PORT = docker port $env:CONTAINER_NAME 3000/tcp |
+                  ForEach-Object { $_.Split(":")[1] }
+
+          Write-Host "Running smoke test on port $PORT"
+
+          .\\scripts\\smoke.ps1 -Port $PORT
         '''
       }
     }
@@ -53,8 +61,8 @@ pipeline {
   post {
     always {
       powershell '''
-        if (docker ps -a --format "{{.Names}}" | Select-String "express-pr-container") {
-          docker rm -f express-pr-container
+        if (docker ps -a --format "{{.Names}}" | Select-String $env:CONTAINER_NAME) {
+          docker rm -f $env:CONTAINER_NAME
         }
       '''
     }
