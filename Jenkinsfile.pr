@@ -1,0 +1,81 @@
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+    skipDefaultCheckout()
+  }
+
+  environment {
+    IMAGE_NAME = "express-pr"
+    CONTAINER_NAME = "express-pr-container"
+    PORT = "3000"
+    ARTIFACTS_DIR = "artifacts"
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Setup') {
+      steps {
+        powershell """
+          docker --version
+          if (!(Test-Path $env:ARTIFACTS_DIR)) {
+            New-Item -ItemType Directory -Path $env:ARTIFACTS_DIR | Out-Null
+          }
+        """
+      }
+    }
+
+    stage('Build') {
+      steps {
+        powershell """
+          docker build -t $env:IMAGE_NAME .
+        """
+      }
+    }
+
+    stage('Run (Docker)') {
+      steps {
+        powershell """
+          docker rm -f $env:CONTAINER_NAME 2>$null | Out-Null
+          docker run -d -p $env:PORT:3000 --name $env:CONTAINER_NAME $env:IMAGE_NAME
+          docker logs $env:CONTAINER_NAME | Out-File $env:ARTIFACTS_DIR/container.log
+        """
+      }
+    }
+
+    stage('Smoke Test') {
+      steps {
+        powershell """
+          .\\scripts\\smoke.ps1 | Tee-Object -FilePath $env:ARTIFACTS_DIR/smoke-result.txt
+        """
+      }
+    }
+
+    stage('Archive Artifacts') {
+      steps {
+        archiveArtifacts artifacts: 'artifacts/**/*', fingerprint: true
+      }
+    }
+  }
+
+  post {
+    always {
+      powershell """
+        docker rm -f $env:CONTAINER_NAME 2>$null | Out-Null
+      """
+    }
+    success {
+      echo "✅ PR BUILD & SMOKE PASSED"
+    }
+    failure {
+      echo "❌ PR BUILD & SMOKE FAILED"
+    }
+  }
+}
