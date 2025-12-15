@@ -4,13 +4,15 @@ const cors = require('cors');
 const routes = require('./routes');
 const db = require('./db'); 
 
+
 const app = express();
 
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
 app.use('/', routes);
-app.listen(3000, () => console.log("Server running on port 3000"));
-
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});
 const PORT = process.env.PORT || 3000;
 
 (async () => {
