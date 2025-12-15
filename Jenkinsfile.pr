@@ -12,6 +12,7 @@ pipeline {
   environment {
     IMAGE_NAME     = "express-pr"
     CONTAINER_NAME = "express-pr-container"
+    PORT           = "3000"
   }
 
   stages {
@@ -37,7 +38,10 @@ pipeline {
             docker rm -f $env:CONTAINER_NAME
           }
 
-          docker run -d --name $env:CONTAINER_NAME -P $env:IMAGE_NAME
+          docker run -d `
+            --name $env:CONTAINER_NAME `
+            -p $env:PORT:3000 `
+            $env:IMAGE_NAME
         '''
       }
     }
@@ -45,14 +49,8 @@ pipeline {
     stage('Smoke Test') {
       steps {
         powershell '''
-          Start-Sleep -Seconds 5
-
-          $PORT = docker port $env:CONTAINER_NAME 3000/tcp |
-                  ForEach-Object { $_.Split(":")[1] }
-
-          Write-Host "Running smoke test on port $PORT"
-
-          .\\scripts\\smoke.ps1 -Port $PORT
+          Start-Sleep -Seconds 8
+          .\\scripts\\smoke.ps1
         '''
       }
     }

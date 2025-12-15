@@ -1,8 +1,4 @@
-param(
-  [int]$Port
-)
-
-$url = "http://localhost:$Port/"
+$url = "http://localhost:3000/"
 $maxAttempts = 10
 $delay = 3
 
