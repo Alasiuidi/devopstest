@@ -1,6 +1,13 @@
-$url = "http://localhost:3000/"
+param (
+  [Parameter(Mandatory=$true)]
+  [string]$PORT
+)
+
+$url = "http://localhost:$PORT/"
 $maxAttempts = 10
 $delay = 3
+
+Write-Host "Running smoke test on $url"
 
 for ($i = 1; $i -le $maxAttempts; $i++) {
   try {
@@ -9,8 +16,7 @@ for ($i = 1; $i -le $maxAttempts; $i++) {
       Write-Host "SMOKE PASSED - API responding"
       exit 0
     }
-  }
-  catch {
+  } catch {
     Write-Host "Attempt $i/$maxAttempts - API not ready yet"
   }
 
