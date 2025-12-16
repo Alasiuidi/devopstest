@@ -3,7 +3,7 @@ param (
   [string]$ContainerName
 )
 
-$maxAttempts = 10
+$maxAttempts = 15
 $delay = 2
 $port = $null
 
@@ -11,12 +11,13 @@ Write-Host "Waiting for Docker port mapping for container: $ContainerName"
 
 for ($i = 1; $i -le $maxAttempts; $i++) {
 
-  $inspect = docker inspect $ContainerName | ConvertFrom-Json
-
-  if ($inspect[0].NetworkSettings.Ports.'3000/tcp') {
-    $port = $inspect[0].NetworkSettings.Ports.'3000/tcp'[0].HostPort
-    break
-  }
+  try {
+    $portLine = docker port $ContainerName 3000 2>$null
+    if ($portLine) {
+      $port = ($portLine -split ":")[-1]
+      break
+    }
+  } catch {}
 
   Write-Host "Attempt $i/$maxAttempts - port not published yet"
   Start-Sleep -Seconds $delay
