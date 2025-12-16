@@ -14,7 +14,7 @@ pipeline {
   stages {
 
     /* =========================
-       CHECKOUT (TOUS LES CAS)
+       CHECKOUT
     ========================= */
     stage('Checkout') {
       steps {
@@ -32,20 +32,19 @@ pipeline {
     }
 
     /* =========================
-       BUILD (TOUS LES CAS)
+       BUILD
     ========================= */
     stage('Build') {
       steps {
         powershell '''
-          docker build -f DOCKERFILE -t %IMAGE_NAME% .
+          Write-Host "Building image: $env:IMAGE_NAME"
+          docker build -f DOCKERFILE -t $env:IMAGE_NAME .
         '''
       }
     }
 
     /* =========================
-       RUN + SMOKE
-       - PR
-       - DEV
+       RUN (DEV + PR)
     ========================= */
     stage('Run (Docker)') {
       when {
@@ -56,19 +55,22 @@ pipeline {
       }
       steps {
         powershell '''
-          if (docker ps -a --format "{{.Names}}" | findstr "%CONTAINER_NAME%") {
-            docker rm -f %CONTAINER_NAME%
+          if (docker ps -a --format "{{.Names}}" | Select-String "$env:CONTAINER_NAME") {
+            docker rm -f $env:CONTAINER_NAME
           }
 
-          docker run -d ^
-            --name %CONTAINER_NAME% ^
-            -e REQUIRE_DB=false ^
-            -p 3000:3000 ^
-            %IMAGE_NAME%
+          docker run -d `
+            --name $env:CONTAINER_NAME `
+            -e REQUIRE_DB=false `
+            -p 3000:3000 `
+            $env:IMAGE_NAME
         '''
       }
     }
 
+    /* =========================
+       SMOKE TEST
+    ========================= */
     stage('Smoke Test') {
       when {
         anyOf {
@@ -93,8 +95,9 @@ pipeline {
       }
       steps {
         powershell '''
-          docker build -f DOCKERFILE -t express-app:%TAG_NAME% .
-          docker save express-app:%TAG_NAME% > release-%TAG_NAME%.tar
+          Write-Host "Release build for tag: $env:TAG_NAME"
+          docker build -f DOCKERFILE -t express-app:$env:TAG_NAME .
+          docker save express-app:$env:TAG_NAME > release-$env:TAG_NAME.tar
         '''
       }
     }
@@ -120,7 +123,7 @@ pipeline {
   post {
     always {
       powershell '''
-        docker rm -f %CONTAINER_NAME% 2>$null
+        docker rm -f $env:CONTAINER_NAME 2>$null
       '''
     }
   }
