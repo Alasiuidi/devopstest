@@ -1,34 +1,12 @@
 param (
   [Parameter(Mandatory = $true)]
-  [string]$ContainerName
+  [string]$PORT
 )
 
-$maxAttempts = 15
-$delay = 2
-$port = $null
+$url = "http://localhost:$PORT/"
+$maxAttempts = 10
+$delay = 3
 
-Write-Host "Waiting for Docker port mapping for container: $ContainerName"
-
-for ($i = 1; $i -le $maxAttempts; $i++) {
-
-  try {
-    $portLine = docker port $ContainerName 3000 2>$null
-    if ($portLine) {
-      $port = ($portLine -split ":")[-1]
-      break
-    }
-  } catch {}
-
-  Write-Host "Attempt $i/$maxAttempts - port not published yet"
-  Start-Sleep -Seconds $delay
-}
-
-if (-not $port) {
-  Write-Host "SMOKE FAILED - unable to retrieve mapped port"
-  exit 1
-}
-
-$url = "http://localhost:$port/"
 Write-Host "Running smoke test on $url"
 
 for ($i = 1; $i -le $maxAttempts; $i++) {
@@ -39,7 +17,7 @@ for ($i = 1; $i -le $maxAttempts; $i++) {
       exit 0
     }
   } catch {
-    Write-Host "Attempt $i/$maxAttempts - API not ready"
+    Write-Host "Attempt $i/$maxAttempts - API not ready yet"
   }
 
   Start-Sleep -Seconds $delay

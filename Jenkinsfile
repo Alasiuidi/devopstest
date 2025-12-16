@@ -13,27 +13,12 @@ pipeline {
 
   stages {
 
-    /* =========================
-       1. CHECKOUT
-       ========================= */
     stage('Checkout') {
       steps {
         checkout scm
       }
     }
 
-    /* =========================
-       2. SETUP
-       ========================= */
-    stage('Setup') {
-      steps {
-        powershell 'docker --version'
-      }
-    }
-
-    /* =========================
-       3. BUILD
-       ========================= */
     stage('Build') {
       steps {
         powershell '''
@@ -43,56 +28,43 @@ pipeline {
       }
     }
 
-    /* =========================
-       4. RUN (DOCKER)
-       ========================= */
     stage('Run (Docker)') {
       steps {
         powershell '''
           Write-Host "Starting container"
+
+          if (docker ps -a --format "{{.Names}}" | Select-String "$env:CONTAINER_NAME") {
+            docker rm -f $env:CONTAINER_NAME
+          }
+
           docker run -d `
             --name $env:CONTAINER_NAME `
             -e REQUIRE_DB=false `
-            -p 3000:3000 `
+            -P `
             $env:IMAGE_NAME
         '''
       }
     }
 
-    /* =========================
-       5. SMOKE TEST
-       ========================= */
     stage('Smoke Test') {
       steps {
         powershell '''
-          $maxAttempts = 10
-          $delay = 2
-          $url = "http://localhost:3000/"
+          Start-Sleep -Seconds 5
 
-          Write-Host "Running smoke test on $url"
-
-          for ($i = 1; $i -le $maxAttempts; $i++) {
-            try {
-              $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 3
-              if ($response.StatusCode -eq 200) {
-                Write-Host "SMOKE PASSED - API responding"
-                exit 0
-              }
-            } catch {
-              Write-Host "Attempt $i/$maxAttempts - API not ready"
-            }
-            Start-Sleep -Seconds $delay
+          $portLine = docker port $env:CONTAINER_NAME 3000
+          if (-not $portLine) {
+            Write-Host "SMOKE FAILED - no port mapping found"
+            exit 1
           }
 
-          Write-Host "SMOKE FAILED"
-          exit 1
+          $PORT = ($portLine -split ":")[-1]
+          Write-Host "Detected mapped port: $PORT"
+
+          .\\scripts\\smoke.ps1 $PORT
         '''
       }
     }
 
-    /* =========================
-       6. RELEASE BUILD (TAG)
-       ========================= */
     stage('Release Build') {
       when {
         tag pattern: "v\\d+\\.\\d+\\.\\d+", comparator: "REGEXP"
@@ -105,27 +77,20 @@ pipeline {
       }
     }
 
-    /* =========================
-       7. ARCHIVE
-       ========================= */
     stage('Archive Artifacts') {
       steps {
         archiveArtifacts artifacts: '''
-          DOCKERFILE,
           Jenkinsfile,
+          DOCKERFILE,
           scripts/**
         ''', fingerprint: true
       }
     }
   }
 
-  /* =========================
-     CLEANUP
-     ========================= */
   post {
     always {
       powershell '''
-        Write-Host "Cleaning up container"
         docker rm -f $env:CONTAINER_NAME 2>$null
       '''
     }
