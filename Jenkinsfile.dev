@@ -1,0 +1,113 @@
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+  }
+
+  triggers {
+    pollSCM('H/1 * * * *')   // toutes les 2 minutes (local Jenkins)
+  }
+
+  environment {
+    IMAGE_NAME     = "express-dev"
+    CONTAINER_NAME = "express-dev-container"
+  }
+
+  stages {
+
+    /* =======================
+       1. CHECKOUT
+    ======================= */
+    stage('Checkout') {
+      when {
+        branch 'dev'
+      }
+      steps {
+        checkout scm
+      }
+    }
+
+    /* =======================
+       2. SETUP
+    ======================= */
+    stage('Setup') {
+      steps {
+        powershell '''
+          docker --version
+          node --version
+        '''
+      }
+    }
+
+    /* =======================
+       3. BUILD
+    ======================= */
+    stage('Build') {
+      steps {
+        powershell '''
+          docker build -f DOCKERFILE -t $env:IMAGE_NAME .
+        '''
+      }
+    }
+
+    /* =======================
+       4. RUN (DOCKER)
+    ======================= */
+    stage('Run (Docker)') {
+      steps {
+        powershell '''
+          if (docker ps -a --format "{{.Names}}" | Select-String "$env:CONTAINER_NAME") {
+            docker rm -f $env:CONTAINER_NAME
+          }
+
+          docker run -d --name $env:CONTAINER_NAME -e REQUIRE_DB=false -P $env:IMAGE_NAME
+        '''
+      }
+    }
+
+    /* =======================
+       5. SMOKE TEST
+    ======================= */
+    stage('Smoke Test') {
+      steps {
+        powershell '''
+          Start-Sleep -Seconds 5
+
+          $portLine = docker port $env:CONTAINER_NAME 3000
+          $PORT = ($portLine -split ":")[-1]
+
+          Write-Host "Smoke test on port $PORT"
+
+          .\\scripts\\smoke.ps1 $PORT
+        '''
+      }
+    }
+
+    /* =======================
+       6. ARCHIVE ARTIFACTS
+    ======================= */
+    stage('Archive Artifacts') {
+      steps {
+        archiveArtifacts artifacts: '''
+          scripts/**,
+          DOCKERFILE,
+          Jenkinsfile*
+        ''', fingerprint: true
+      }
+    }
+  }
+
+  /* =======================
+     CLEANUP
+  ======================= */
+  post {
+    always {
+      powershell '''
+        if (docker ps -a --format "{{.Names}}" | Select-String "$env:CONTAINER_NAME") {
+          docker rm -f $env:CONTAINER_NAME
+        }
+      '''
+    }
+  }
+}
