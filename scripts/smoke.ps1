@@ -3,10 +3,10 @@ param (
   [string]$ContainerName
 )
 
-# récupérer le port host mappé vers 3000
-$port = docker inspect `
-  --format='{{(index (index .NetworkSettings.Ports "3000/tcp") 0).HostPort}}' `
-  $ContainerName
+# Récupérer les infos réseau du container
+$inspect = docker inspect $ContainerName | ConvertFrom-Json
+
+$port = $inspect[0].NetworkSettings.Ports.'3000/tcp'[0].HostPort
 
 if (-not $port) {
   Write-Host "❌ Impossible de récupérer le port mappé"
