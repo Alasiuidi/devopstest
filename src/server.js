@@ -25,3 +25,5 @@ app.use('/', routes);
     process.exit(1);
   }
 })();
+console.log("PR smoke test");
+
