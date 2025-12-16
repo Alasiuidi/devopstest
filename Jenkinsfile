@@ -40,7 +40,7 @@ pipeline {
       steps {
         powershell '''
           Write-Host "Building Docker image"
-          docker build -f DOCKERFILE -t %IMAGE_NAME% .
+          docker build -f DOCKERFILE -t $env:IMAGE_NAME .
         '''
       }
     }
@@ -51,11 +51,11 @@ pipeline {
     stage('Run (Docker)') {
       steps {
         powershell '''
-          docker run -d ^
-            --name %CONTAINER_NAME% ^
-            -e REQUIRE_DB=false ^
-            -P ^
-            %IMAGE_NAME%
+          docker run -d `
+            --name $env:CONTAINER_NAME `
+            -e REQUIRE_DB=false `
+            -P `
+            $env:IMAGE_NAME
         '''
       }
     }
@@ -68,11 +68,10 @@ pipeline {
         powershell '''
           Start-Sleep -Seconds 5
 
-          $portLine = docker port %CONTAINER_NAME% 3000
+          $portLine = docker port $env:CONTAINER_NAME 3000
           $PORT = ($portLine -split ":")[-1]
 
           Write-Host "Smoke test on port $PORT"
-
           .\\scripts\\smoke.ps1 $PORT
         '''
       }
@@ -87,8 +86,8 @@ pipeline {
       }
       steps {
         powershell '''
-          Write-Host "Release build for tag %GIT_TAG%"
-          docker tag %IMAGE_NAME% %IMAGE_NAME%:%GIT_TAG%
+          Write-Host "Release build for tag $env:GIT_TAG"
+          docker tag $env:IMAGE_NAME $env:IMAGE_NAME:$env:GIT_TAG
         '''
       }
     }
@@ -113,8 +112,8 @@ pipeline {
   post {
     always {
       powershell '''
-        if (docker ps -a --format "{{.Names}}" | findstr "%CONTAINER_NAME%") {
-          docker rm -f %CONTAINER_NAME%
+        if (docker ps -a --format "{{.Names}}" | Select-String "$env:CONTAINER_NAME") {
+          docker rm -f $env:CONTAINER_NAME
         }
       '''
     }
