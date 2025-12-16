@@ -11,7 +11,7 @@ const contactRoutes = require('./contact');
 
 
 router.get('/', (req, res) => {
-  res.json({ message: 'Hello from Express API!' });
+  res.json({ message: 'Hello from Express API!-- PRtest' });
 });
 
 router.use('/auth', authRoutes);
