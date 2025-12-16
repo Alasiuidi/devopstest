@@ -35,7 +35,6 @@ pipeline {
       steps {
         powershell '''
           docker --version
-          node --version
         '''
       }
     }
