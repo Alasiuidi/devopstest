@@ -5,132 +5,122 @@ pipeline {
     timestamps()
   }
 
-  triggers {
-    pollSCM('H/2 * * * *') // Jenkins local
-  }
-
   environment {
-    IMAGE_BASE = "express-app"
+    IMAGE_NAME     = "express-app"
+    CONTAINER_NAME = "express-${BRANCH_NAME}"
+    APP_PORT       = "3000"
   }
 
   stages {
 
-    /* =====================
-       CHECKOUT
-    ===================== */
+    /* =========================
+       CHECKOUT (TOUS LES CAS)
+    ========================= */
     stage('Checkout') {
       steps {
         checkout scm
       }
     }
 
-    /* =====================
+    /* =========================
        SETUP
-    ===================== */
+    ========================= */
     stage('Setup') {
       steps {
-        powershell '''
-          docker --version
-        '''
+        powershell 'docker --version'
       }
     }
 
-    /* =====================
-       BUILD IMAGE
-    ===================== */
+    /* =========================
+       BUILD (TOUS LES CAS)
+    ========================= */
     stage('Build') {
       steps {
         powershell '''
-          docker build -f DOCKERFILE -t $env:IMAGE_BASE:$env:BUILD_NUMBER .
+          docker build -f DOCKERFILE -t %IMAGE_NAME% .
         '''
       }
     }
 
-    /* =====================
-       RUN (feature + dev)
-    ===================== */
+    /* =========================
+       RUN + SMOKE
+       - PR
+       - DEV
+    ========================= */
     stage('Run (Docker)') {
       when {
         anyOf {
           branch 'dev'
-          branch 'feature/*'
+          expression { env.CHANGE_ID != null }
         }
       }
       steps {
         powershell '''
-          $container="app-$env:BUILD_NUMBER"
+          if (docker ps -a --format "{{.Names}}" | findstr "%CONTAINER_NAME%") {
+            docker rm -f %CONTAINER_NAME%
+          }
 
-          docker rm -f $container 2>$null
-
-          docker run -d `
-            --name $container `
-            -e REQUIRE_DB=false `
-            -P `
-            $env:IMAGE_BASE:$env:BUILD_NUMBER
+          docker run -d ^
+            --name %CONTAINER_NAME% ^
+            -e REQUIRE_DB=false ^
+            -p 3000:3000 ^
+            %IMAGE_NAME%
         '''
       }
     }
 
-    /* =====================
-       SMOKE TEST
-    ===================== */
     stage('Smoke Test') {
       when {
         anyOf {
           branch 'dev'
-          branch 'feature/*'
+          expression { env.CHANGE_ID != null }
         }
       }
       steps {
         powershell '''
           Start-Sleep -Seconds 5
-
-          $container="app-$env:BUILD_NUMBER"
-          $portLine = docker port $container 3000
-          $PORT = ($portLine -split ":")[-1]
-
-          .\\scripts\\smoke.ps1 $PORT
+          .\\scripts\\smoke.ps1 3000
         '''
       }
     }
 
-    /* =====================
-       RELEASE (TAG)
-    ===================== */
+    /* =========================
+       RELEASE BUILD (TAG)
+    ========================= */
     stage('Release Build') {
       when {
-        buildingTag()
+        tag pattern: "v\\d+\\.\\d+\\.\\d+", comparator: "REGEXP"
       }
       steps {
         powershell '''
-          docker build -f DOCKERFILE -t $env:IMAGE_BASE:$env:GIT_TAG_NAME .
+          docker build -f DOCKERFILE -t express-app:%TAG_NAME% .
+          docker save express-app:%TAG_NAME% > release-%TAG_NAME%.tar
         '''
       }
     }
 
-    /* =====================
+    /* =========================
        ARCHIVE
-    ===================== */
+    ========================= */
     stage('Archive Artifacts') {
       steps {
         archiveArtifacts artifacts: '''
+          release-*.tar,
           scripts/**,
-          DOCKERFILE,
-          Jenkinsfile
+          Jenkinsfile,
+          DOCKERFILE
         ''', fingerprint: true
       }
     }
   }
 
-  /* =====================
+  /* =========================
      CLEANUP
-  ===================== */
+  ========================= */
   post {
     always {
       powershell '''
-        docker ps -a --format "{{.Names}}" | Where-Object { $_ -like "app-*" } | ForEach-Object {
-          docker rm -f $_
-        }
+        docker rm -f %CONTAINER_NAME% 2>$null
       '''
     }
   }
