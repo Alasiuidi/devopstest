@@ -23,5 +23,5 @@ for ($i = 1; $i -le $maxAttempts; $i++) {
   Start-Sleep -Seconds $delay
 }
 
-Write-Host "SMOKE FAILED - API NOT RESPONDING"
+Write-Error "SMOKE FAILED - API NOT RESPONDING"
 exit 1

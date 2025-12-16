@@ -33,9 +33,7 @@ pipeline {
         powershell '''
           Write-Host "Starting container"
 
-          if (docker ps -a --format "{{.Names}}" | Select-String "$env:CONTAINER_NAME") {
-            docker rm -f $env:CONTAINER_NAME
-          }
+          docker rm -f $env:CONTAINER_NAME 2>$null
 
           docker run -d `
             --name $env:CONTAINER_NAME `
@@ -53,7 +51,7 @@ pipeline {
 
           $portLine = docker port $env:CONTAINER_NAME 3000
           if (-not $portLine) {
-            Write-Host "SMOKE FAILED - no port mapping found"
+            Write-Error "SMOKE FAILED - no port mapping found"
             exit 1
           }
 
@@ -72,7 +70,7 @@ pipeline {
       steps {
         powershell '''
           Write-Host "Release build for tag $env:GIT_TAG"
-          docker tag $env:IMAGE_NAME $env:IMAGE_NAME:$env:GIT_TAG
+          docker tag $env:IMAGE_NAME "$env:IMAGE_NAME:$env:GIT_TAG"
         '''
       }
     }
