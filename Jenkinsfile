@@ -3,7 +3,7 @@ pipeline {
 
   options {
     timestamps()
-    disableConcurrentBuilds()   // évite conflits Docker
+    disableConcurrentBuilds()
   }
 
   environment {
@@ -13,29 +13,18 @@ pipeline {
 
   stages {
 
-    /* =========================
-       1. CHECKOUT
-    ========================= */
     stage('Checkout') {
       steps {
         checkout scm
       }
     }
 
-    /* =========================
-       2. SETUP
-    ========================= */
     stage('Setup') {
       steps {
-        powershell '''
-          docker --version
-        '''
+        powershell 'docker --version'
       }
     }
 
-    /* =========================
-       3. BUILD
-    ========================= */
     stage('Build') {
       steps {
         powershell '''
@@ -45,9 +34,6 @@ pipeline {
       }
     }
 
-    /* =========================
-       4. RUN (DOCKER)
-    ========================= */
     stage('Run (Docker)') {
       steps {
         powershell '''
@@ -60,26 +46,15 @@ pipeline {
       }
     }
 
-    /* =========================
-       5. SMOKE TEST
-    ========================= */
     stage('Smoke Test') {
       steps {
         powershell '''
           Start-Sleep -Seconds 5
-
-          $portLine = docker port $env:CONTAINER_NAME 3000
-          $PORT = ($portLine -split ":")[-1]
-
-          Write-Host "Smoke test on port $PORT"
-          .\\scripts\\smoke.ps1 $PORT
+          .\\scripts\\smoke.ps1 $env:CONTAINER_NAME
         '''
       }
     }
 
-    /* =========================
-       6. RELEASE (TAGS vX.Y.Z)
-    ========================= */
     stage('Release Build') {
       when {
         tag pattern: "v\\d+\\.\\d+\\.\\d+", comparator: "REGEXP"
@@ -92,9 +67,6 @@ pipeline {
       }
     }
 
-    /* =========================
-       7. ARCHIVE ARTIFACTS
-    ========================= */
     stage('Archive Artifacts') {
       steps {
         archiveArtifacts artifacts: '''
@@ -106,9 +78,6 @@ pipeline {
     }
   }
 
-  /* =========================
-     CLEANUP
-  ========================= */
   post {
     always {
       powershell '''
