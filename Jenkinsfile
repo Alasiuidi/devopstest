@@ -9,6 +9,7 @@ pipeline {
   environment {
     IMAGE_NAME     = "express-app"
     CONTAINER_NAME = "express-ci-${env.BUILD_NUMBER}"
+    APP_PORT       = "3000"
   }
 
   stages {
@@ -38,7 +39,7 @@ pipeline {
           docker run -d `
             --name $env:CONTAINER_NAME `
             -e REQUIRE_DB=false `
-            -P `
+            -p $env:APP_PORT:$env:APP_PORT `
             $env:IMAGE_NAME
         '''
       }
@@ -48,17 +49,7 @@ pipeline {
       steps {
         powershell '''
           Start-Sleep -Seconds 5
-
-          $portLine = docker port $env:CONTAINER_NAME 3000
-          if (-not $portLine) {
-            Write-Error "SMOKE FAILED - no port mapping found"
-            exit 1
-          }
-
-          $PORT = ($portLine -split ":")[-1]
-          Write-Host "Detected mapped port: $PORT"
-
-          .\\scripts\\smoke.ps1 $PORT
+          .\\scripts\\smoke.ps1 $env:APP_PORT
         '''
       }
     }
