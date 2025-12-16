@@ -3,21 +3,32 @@ param (
   [string]$ContainerName
 )
 
-# Récupérer les infos réseau du container
-$inspect = docker inspect $ContainerName | ConvertFrom-Json
+$maxAttempts = 10
+$delay = 2
+$port = $null
 
-$port = $inspect[0].NetworkSettings.Ports.'3000/tcp'[0].HostPort
+Write-Host "🔎 Waiting for Docker port mapping for container: $ContainerName"
+
+for ($i = 1; $i -le $maxAttempts; $i++) {
+
+  $inspect = docker inspect $ContainerName | ConvertFrom-Json
+
+  if ($inspect[0].NetworkSettings.Ports.'3000/tcp') {
+    $port = $inspect[0].NetworkSettings.Ports.'3000/tcp'[0].HostPort
+    break
+  }
+
+  Write-Host "Attempt $i/$maxAttempts - port not published yet"
+  Start-Sleep -Seconds $delay
+}
 
 if (-not $port) {
-  Write-Host "❌ Impossible de récupérer le port mappé"
+  Write-Host "❌ Failed to retrieve mapped port"
   exit 1
 }
 
 $url = "http://localhost:$port/"
-$maxAttempts = 10
-$delay = 3
-
-Write-Host "Running smoke test on $url (container: $ContainerName)"
+Write-Host "🚀 Running smoke test on $url"
 
 for ($i = 1; $i -le $maxAttempts; $i++) {
   try {
@@ -27,8 +38,9 @@ for ($i = 1; $i -le $maxAttempts; $i++) {
       exit 0
     }
   } catch {
-    Write-Host "Attempt $i/$maxAttempts - API not ready yet"
+    Write-Host "Attempt $i/$maxAttempts - API not ready"
   }
+
   Start-Sleep -Seconds $delay
 }
 
