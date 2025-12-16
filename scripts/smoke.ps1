@@ -1,13 +1,16 @@
 param (
   [Parameter(Mandatory = $true)]
-  [string]$PORT
+  [string]$ContainerName,
+
+  [Parameter(Mandatory = $true)]
+  [string]$Port
 )
 
-$url = "http://localhost:$PORT/"
+$url = "http://localhost:$Port/"
 $maxAttempts = 10
 $delay = 3
 
-Write-Host "Running smoke test on $url"
+Write-Host "Running smoke test on $url (container: $ContainerName)"
 
 for ($i = 1; $i -le $maxAttempts; $i++) {
   try {
