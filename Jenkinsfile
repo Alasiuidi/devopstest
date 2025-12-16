@@ -3,18 +3,18 @@ pipeline {
 
   options {
     timestamps()
+    disableConcurrentBuilds()   // évite conflits Docker
   }
 
   environment {
     IMAGE_NAME     = "express-app"
-    CONTAINER_NAME = "express-${BRANCH_NAME}"
-    APP_PORT       = "3000"
+    CONTAINER_NAME = "express-ci-${env.BUILD_NUMBER}"
   }
 
   stages {
 
     /* =========================
-       CHECKOUT
+       1. CHECKOUT
     ========================= */
     stage('Checkout') {
       steps {
@@ -23,71 +23,63 @@ pipeline {
     }
 
     /* =========================
-       SETUP
+       2. SETUP
     ========================= */
     stage('Setup') {
       steps {
-        powershell 'docker --version'
+        powershell '''
+          docker --version
+        '''
       }
     }
 
     /* =========================
-       BUILD
+       3. BUILD
     ========================= */
     stage('Build') {
       steps {
         powershell '''
-          Write-Host "Building image: $env:IMAGE_NAME"
-          docker build -f DOCKERFILE -t $env:IMAGE_NAME .
+          Write-Host "Building Docker image"
+          docker build -f DOCKERFILE -t %IMAGE_NAME% .
         '''
       }
     }
 
     /* =========================
-       RUN (DEV + PR)
+       4. RUN (DOCKER)
     ========================= */
     stage('Run (Docker)') {
-      when {
-        anyOf {
-          branch 'dev'
-          expression { env.CHANGE_ID != null }
-        }
-      }
       steps {
         powershell '''
-          if (docker ps -a --format "{{.Names}}" | Select-String "$env:CONTAINER_NAME") {
-            docker rm -f $env:CONTAINER_NAME
-          }
-
-          docker run -d `
-            --name $env:CONTAINER_NAME `
-            -e REQUIRE_DB=false `
-            -p 3000:3000 `
-            $env:IMAGE_NAME
+          docker run -d ^
+            --name %CONTAINER_NAME% ^
+            -e REQUIRE_DB=false ^
+            -P ^
+            %IMAGE_NAME%
         '''
       }
     }
 
     /* =========================
-       SMOKE TEST
+       5. SMOKE TEST
     ========================= */
     stage('Smoke Test') {
-      when {
-        anyOf {
-          branch 'dev'
-          expression { env.CHANGE_ID != null }
-        }
-      }
       steps {
         powershell '''
           Start-Sleep -Seconds 5
-          .\\scripts\\smoke.ps1 3000
+
+          $portLine = docker port %CONTAINER_NAME% 3000
+          $PORT = ($portLine -split ":")[-1]
+
+          Write-Host "Smoke test on port $PORT"
+
+          .\\scripts\\smoke.ps1 $PORT
         '''
       }
     }
 
     /* =========================
-       RELEASE BUILD (TAG)
+       6. RELEASE (TAGS vX.Y.Z)
     ========================= */
     stage('Release Build') {
       when {
@@ -95,23 +87,21 @@ pipeline {
       }
       steps {
         powershell '''
-          Write-Host "Release build for tag: $env:TAG_NAME"
-          docker build -f DOCKERFILE -t express-app:$env:TAG_NAME .
-          docker save express-app:$env:TAG_NAME > release-$env:TAG_NAME.tar
+          Write-Host "Release build for tag %GIT_TAG%"
+          docker tag %IMAGE_NAME% %IMAGE_NAME%:%GIT_TAG%
         '''
       }
     }
 
     /* =========================
-       ARCHIVE
+       7. ARCHIVE ARTIFACTS
     ========================= */
     stage('Archive Artifacts') {
       steps {
         archiveArtifacts artifacts: '''
-          release-*.tar,
           scripts/**,
-          Jenkinsfile,
-          DOCKERFILE
+          DOCKERFILE,
+          Jenkinsfile
         ''', fingerprint: true
       }
     }
@@ -123,7 +113,9 @@ pipeline {
   post {
     always {
       powershell '''
-        docker rm -f $env:CONTAINER_NAME 2>$null
+        if (docker ps -a --format "{{.Names}}" | findstr "%CONTAINER_NAME%") {
+          docker rm -f %CONTAINER_NAME%
+        }
       '''
     }
   }
