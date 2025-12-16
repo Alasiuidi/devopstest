@@ -60,8 +60,8 @@ pipeline {
       }
       steps {
         powershell '''
-          Write-Host "Release build for tag $env:GIT_TAG"
-          docker tag $env:IMAGE_NAME "$env:IMAGE_NAME:$env:GIT_TAG"
+          Write-Host "Release build for tag $env:BRANCH_NAME"
+          docker tag $env:IMAGE_NAME "$env:IMAGE_NAME:$env:BRANCH_NAME"
         '''
       }
     }
