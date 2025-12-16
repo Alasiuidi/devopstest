@@ -40,7 +40,7 @@ pipeline {
           docker run -d `
             --name $env:CONTAINER_NAME `
             -e REQUIRE_DB=false `
-            -P `
+            -p 0:3000 `
             $env:IMAGE_NAME
         '''
       }
