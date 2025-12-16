@@ -6,12 +6,13 @@ pipeline {
   }
 
   triggers {
-    pollSCM('H/1 * * * *')   // toutes les 2 minutes (local Jenkins)
+    pollSCM('H/1 * * * *')   // Jenkins local : vérifie les commits chaque minute
   }
 
   environment {
     IMAGE_NAME     = "express-dev"
     CONTAINER_NAME = "express-dev-container"
+    APP_PORT       = "3000"
   }
 
   stages {
@@ -60,7 +61,11 @@ pipeline {
             docker rm -f $env:CONTAINER_NAME
           }
 
-          docker run -d --name $env:CONTAINER_NAME -e REQUIRE_DB=false -P $env:IMAGE_NAME
+          docker run -d `
+            --name $env:CONTAINER_NAME `
+            -e REQUIRE_DB=false `
+            -p $env:APP_PORT:3000 `
+            $env:IMAGE_NAME
         '''
       }
     }
@@ -72,13 +77,8 @@ pipeline {
       steps {
         powershell '''
           Start-Sleep -Seconds 5
-
-          $portLine = docker port $env:CONTAINER_NAME 3000
-          $PORT = ($portLine -split ":")[-1]
-
-          Write-Host "Smoke test on port $PORT"
-
-          .\\scripts\\smoke.ps1 $PORT
+          Write-Host "Running smoke test on port $env:APP_PORT"
+          .\\scripts\\smoke.ps1 $env:APP_PORT
         '''
       }
     }
